@@ -112,3 +112,8 @@
     transition-duration: 0.01ms !important;
   }
 }
+
+/* cmdk renders its group headings via a data attribute rather than a prop. */
+[cmdk-group-heading] {
+  @apply px-2.5 pb-1 pt-2 text-2xs font-semibold uppercase tracking-[0.09em] text-fg-dim;
+}
