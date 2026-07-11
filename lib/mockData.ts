@@ -1,4 +1,5 @@
 import { EPOCH_ANCHOR, hashSeed, makeRng, pick, randomInt } from './simulate';
+import { clamp } from './utils';
 import type {
   Alert,
   Cluster,
@@ -61,26 +62,89 @@ function hex(rng: () => number, length: number): string {
   return out;
 }
 
-function statusFrom(rng: () => number, environment: string): Status {
-  // Production is kept healthier than dev, which is what a real fleet looks like.
-  const roll = rng();
-  if (environment === 'production') return roll > 0.92 ? 'degraded' : 'healthy';
-  if (environment === 'dev') {
-    if (roll > 0.9) return 'down';
-    return roll > 0.72 ? 'degraded' : 'healthy';
-  }
-  return roll > 0.82 ? 'degraded' : 'healthy';
+/**
+ * How risky each environment is, used to decide which clusters get the bad
+ * statuses. Production is the least likely to be unhealthy; dev the most.
+ */
+const ENV_RISK: Record<string, number> = {
+  production: 0.35,
+  staging: 0.7,
+  canary: 0.85,
+  dev: 1,
+};
+
+/**
+ * Assigns cluster health from a fixed quota rather than an independent roll per
+ * cluster.
+ *
+ * Per-cluster coin flips are right in expectation but not for any given seed —
+ * the first version of this produced a fleet where all 15 clusters were
+ * Healthy, which makes the status column, the colour coding and the status
+ * filter all look broken. A quota guarantees the spread a monitoring view
+ * exists to show, while the risk weighting keeps production the healthiest.
+ */
+function planHealth(
+  rng: () => number,
+  entries: { name: string; environment: string }[],
+): Map<string, Status> {
+  const total = entries.length;
+  const downCount = Math.max(1, Math.round(total * 0.07));
+  const degradedCount = Math.max(2, Math.round(total * 0.2));
+
+  const ranked = entries
+    .map((entry) => ({
+      name: entry.name,
+      weight: (ENV_RISK[entry.environment] ?? 0.7) * (0.5 + rng()),
+    }))
+    .sort((a, b) => b.weight - a.weight);
+
+  const plan = new Map<string, Status>();
+  ranked.forEach((entry, index) => {
+    if (index < downCount) plan.set(entry.name, 'down');
+    else if (index < downCount + degradedCount) plan.set(entry.name, 'degraded');
+    else plan.set(entry.name, 'healthy');
+  });
+
+  return plan;
 }
 
-function makeNodes(rng: () => number, clusterName: string, count: number): Node[] {
+/**
+ * Nodes are generated to match the cluster's status, so a Degraded cluster
+ * actually contains a degraded node and its CPU/memory look the part. Rolling
+ * them independently let a cluster claim it was down while every node
+ * underneath reported healthy.
+ */
+function makeNodes(
+  rng: () => number,
+  clusterName: string,
+  count: number,
+  clusterStatus: Status,
+): Node[] {
+  const unhealthy =
+    clusterStatus === 'down'
+      ? Math.max(1, Math.round(count * 0.6))
+      : clusterStatus === 'degraded'
+        ? Math.max(1, Math.round(count * 0.25))
+        : 0;
+
+  const badIndices = new Set<number>();
+  let guard = 0;
+  while (badIndices.size < unhealthy && guard < count * 8) {
+    badIndices.add(randomInt(rng, 0, count - 1));
+    guard += 1;
+  }
+
   return Array.from({ length: count }, (_, index) => {
-    const status: Status = rng() > 0.94 ? 'degraded' : rng() > 0.99 ? 'down' : 'healthy';
+    const bad = badIndices.has(index);
+    const status: Status = !bad ? 'healthy' : clusterStatus === 'down' ? 'down' : 'degraded';
+    const load = bad ? 86 + rng() * 12 : 22 + rng() * 52;
+
     return {
       id: `${clusterName}-node-${index + 1}`,
       name: `ip-10-${randomInt(rng, 0, 255)}-${randomInt(rng, 0, 255)}-${randomInt(rng, 0, 255)}`,
       status,
-      cpu: Number((22 + rng() * 62).toFixed(1)),
-      memory: Number((30 + rng() * 55).toFixed(1)),
+      cpu: Number(load.toFixed(1)),
+      memory: Number(clamp(load + (rng() - 0.4) * 16, 14, 99).toFixed(1)),
       pods: randomInt(rng, 8, 42),
       kubelet: pick(rng, K8S_VERSIONS),
     };
@@ -93,41 +157,46 @@ export function getClusters(): Cluster[] {
   if (clustersCache) return clustersCache;
 
   const rng = makeRng(hashSeed('pulse:clusters:v1'));
-  const clusters: Cluster[] = [];
 
+  // Names first, so health can be planned across the whole fleet at once.
+  const planned: { name: string; environment: string; region: (typeof REGIONS)[number] }[] = [];
   for (const environment of ENVIRONMENTS) {
     const regionCount = environment === 'production' ? 5 : environment === 'staging' ? 4 : 3;
     for (let i = 0; i < regionCount; i += 1) {
-      const region = REGIONS[(clusters.length * 3 + i) % REGIONS.length]!;
+      const region = REGIONS[(planned.length * 3 + i) % REGIONS.length]!;
       const name = `${environment}-${region.label}`;
-      if (clusters.some((c) => c.name === name)) continue;
-
-      const status = statusFrom(rng, environment);
-      const nodeCount =
-        environment === 'production' ? randomInt(rng, 6, 18) : randomInt(rng, 2, 8);
-      const nodeList = makeNodes(rng, name, nodeCount);
-
-      clusters.push({
-        id: name,
-        name,
-        region: region.label,
-        provider: region.provider,
-        status,
-        nodes: nodeCount,
-        pods: nodeList.reduce((sum, node) => sum + node.pods, 0),
-        cpu: Number(
-          (nodeList.reduce((s, n) => s + n.cpu, 0) / Math.max(nodeList.length, 1)).toFixed(1),
-        ),
-        memory: Number(
-          (nodeList.reduce((s, n) => s + n.memory, 0) / Math.max(nodeList.length, 1)).toFixed(
-            1,
-          ),
-        ),
-        version: pick(rng, K8S_VERSIONS),
-        updatedAt: EPOCH_ANCHOR - randomInt(rng, 5, 900) * 1000,
-        nodeList,
-      });
+      if (planned.some((entry) => entry.name === name)) continue;
+      planned.push({ name, environment, region });
     }
+  }
+
+  const healthPlan = planHealth(rng, planned);
+  const clusters: Cluster[] = [];
+
+  for (const { name, environment, region } of planned) {
+    const status = healthPlan.get(name) ?? 'healthy';
+    const nodeCount =
+      environment === 'production' ? randomInt(rng, 6, 18) : randomInt(rng, 2, 8);
+    const nodeList = makeNodes(rng, name, nodeCount, status);
+
+    clusters.push({
+      id: name,
+      name,
+      region: region.label,
+      provider: region.provider,
+      status,
+      nodes: nodeCount,
+      pods: nodeList.reduce((sum, node) => sum + node.pods, 0),
+      cpu: Number(
+        (nodeList.reduce((s, n) => s + n.cpu, 0) / Math.max(nodeList.length, 1)).toFixed(1),
+      ),
+      memory: Number(
+        (nodeList.reduce((s, n) => s + n.memory, 0) / Math.max(nodeList.length, 1)).toFixed(1),
+      ),
+      version: pick(rng, K8S_VERSIONS),
+      updatedAt: EPOCH_ANCHOR - randomInt(rng, 5, 900) * 1000,
+      nodeList,
+    });
   }
 
   clustersCache = clusters;
