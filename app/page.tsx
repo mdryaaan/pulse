@@ -43,14 +43,17 @@ export default function OverviewPage() {
     max: 30,
     spikes: false,
   });
+  // Bounds are derived from the base rather than hard-coded: a fixed ceiling of
+  // 2000 sat below the actual pod count, so every sample clamped to the rail and
+  // the sparkline rendered as a flat line.
   const podSeries = makeSeries({
     seed: 'fleet:pods',
     range: '24h',
     base: metrics.pods,
-    amplitude: 40,
-    volatility: 12,
-    min: 0,
-    max: 2000,
+    amplitude: metrics.pods * 0.04,
+    volatility: metrics.pods * 0.012,
+    min: metrics.pods * 0.8,
+    max: metrics.pods * 1.2,
     spikes: false,
   });
 

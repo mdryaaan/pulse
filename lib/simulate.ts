@@ -90,6 +90,11 @@ export function makeSeries(options: {
   const { points, stepMs } = RANGE_CONFIG[range];
   const rng = makeRng(hashSeed(`${seed}:${range}`));
 
+  // A base outside [min, max] clamps every sample to a rail and produces a dead
+  // straight line, which is easy to introduce and hard to spot. Widen instead.
+  const lo = Math.min(min, base - amplitude);
+  const hi = Math.max(max, base + amplitude);
+
   let drift = 0;
   const series: Point[] = [];
 
@@ -109,12 +114,12 @@ export function makeSeries(options: {
 
     // A rare spike, decaying over the following few samples.
     if (spikes && rng() > 0.975) {
-      value += (max - base) * (0.35 + rng() * 0.4);
+      value += (hi - base) * (0.35 + rng() * 0.4);
     }
 
     series.push({
       t: endAt - (points - 1 - i) * stepMs,
-      v: Number(clamp(value, min, max).toFixed(2)),
+      v: Number(clamp(value, lo, hi).toFixed(2)),
     });
   }
 
