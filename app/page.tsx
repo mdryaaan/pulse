@@ -1,7 +1,6 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
 import { Activity, Boxes, Cpu, MemoryStick, Server } from 'lucide-react';
 
 import MetricChart from '@/components/charts/MetricChart';
@@ -9,20 +8,13 @@ import StatCard from '@/components/ui/StatCard';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { useLiveMetrics } from '@/hooks/useLiveMetrics';
 import { getAlerts, getDeployments } from '@/lib/mockData';
-import { EPOCH_ANCHOR, makeSeries } from '@/lib/simulate';
+import { useSimulatedClock } from '@/hooks/useSimulatedClock';
+import { makeSeries } from '@/lib/simulate';
 import { cx, timeAgo } from '@/lib/utils';
 
 export default function OverviewPage() {
   const { metrics } = useLiveMetrics();
-
-  // Relative timestamps need a clock, and reading it during render would differ
-  // between server and client. Fixed anchor first, real clock after mount.
-  const [now, setNow] = useState(EPOCH_ANCHOR);
-  useEffect(() => {
-    setNow(Date.now());
-    const id = window.setInterval(() => setNow(Date.now()), 30_000);
-    return () => window.clearInterval(id);
-  }, []);
+  const now = useSimulatedClock();
 
   const alerts = getAlerts()
     .filter((a) => !a.resolved)

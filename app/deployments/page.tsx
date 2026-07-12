@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import { Fragment, useMemo, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
 import FilterDropdown from '@/components/ui/FilterDropdown';
@@ -8,7 +8,7 @@ import Pagination from '@/components/ui/Pagination';
 import SearchInput from '@/components/ui/SearchInput';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { getDeployments } from '@/lib/mockData';
-import { EPOCH_ANCHOR } from '@/lib/simulate';
+import { useSimulatedClock } from '@/hooks/useSimulatedClock';
 import { cx, formatDateTime, timeAgo } from '@/lib/utils';
 import type { PodInstance } from '@/lib/types';
 
@@ -39,9 +39,7 @@ export default function DeploymentsPage() {
   const [status, setStatus] = useState('all');
   const [page, setPage] = useState(1);
   const [expanded, setExpanded] = useState<string | null>(null);
-
-  const [now, setNow] = useState(EPOCH_ANCHOR);
-  useEffect(() => setNow(Date.now()), []);
+  const now = useSimulatedClock();
 
   const all = getDeployments();
 

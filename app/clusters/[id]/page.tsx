@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ArrowLeft, Boxes, Cpu, MemoryStick, Server } from 'lucide-react';
 
 import MetricChart from '@/components/charts/MetricChart';
@@ -11,15 +11,15 @@ import LogTail from '@/components/ui/LogTail';
 import StatusBadge from '@/components/ui/StatusBadge';
 import TimeRangeSelector from '@/components/ui/TimeRangeSelector';
 import { getCluster } from '@/lib/mockData';
-import { EPOCH_ANCHOR, makeSeries } from '@/lib/simulate';
+import { useSimulatedClock } from '@/hooks/useSimulatedClock';
+import { makeSeries } from '@/lib/simulate';
 import { cx, formatDateTime } from '@/lib/utils';
 import type { Node, TimeRange } from '@/lib/types';
 
 export default function ClusterDetailPage() {
   const params = useParams<{ id: string }>();
   const [range, setRange] = useState<TimeRange>('24h');
-  const [now, setNow] = useState(EPOCH_ANCHOR);
-  useEffect(() => setNow(Date.now()), []);
+  const now = useSimulatedClock();
 
   const id = decodeURIComponent(params.id ?? '');
   const cluster = getCluster(id);

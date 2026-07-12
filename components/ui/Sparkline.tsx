@@ -7,8 +7,10 @@ import type { Point } from '@/lib/types';
 /**
  * A bare trend line for stat cards — no axes, no grid, no tooltip.
  *
- * The Y domain is set from the data rather than [0, 100] so small movements
- * stay visible; a sparkline pinned to an absolute scale reads as a flat line.
+ * The Y domain is padded as a fraction of the series' own range rather than by
+ * a fixed amount. A constant pad works for CPU but flattens uptime, whose whole
+ * span is a few hundredths of a percent — those cards rendered as dead straight
+ * lines until the padding became relative.
  */
 export default function Sparkline({
   data,
@@ -28,6 +30,11 @@ export default function Sparkline({
 
   const id = `spark-${tone}`;
 
+  const values = data.map((point) => point.v);
+  const min = values.length ? Math.min(...values) : 0;
+  const max = values.length ? Math.max(...values) : 1;
+  const pad = Math.max((max - min) * 0.18, 0.0001);
+
   return (
     <div style={{ height }} aria-hidden="true">
       <ResponsiveContainer width="100%" height="100%">
@@ -38,7 +45,7 @@ export default function Sparkline({
               <stop offset="100%" stopColor={stroke} stopOpacity={0} />
             </linearGradient>
           </defs>
-          <YAxis hide domain={['dataMin - 4', 'dataMax + 4']} />
+          <YAxis hide domain={[min - pad, max + pad]} />
           <Area
             type="monotone"
             dataKey="v"

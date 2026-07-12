@@ -1,14 +1,14 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import DataTable, { type Column } from '@/components/ui/DataTable';
 import FilterDropdown from '@/components/ui/FilterDropdown';
 import SearchInput from '@/components/ui/SearchInput';
 import StatusBadge from '@/components/ui/StatusBadge';
 import { getClusters } from '@/lib/mockData';
-import { EPOCH_ANCHOR } from '@/lib/simulate';
+import { useSimulatedClock } from '@/hooks/useSimulatedClock';
 import { cx, timeAgo } from '@/lib/utils';
 import type { Cluster } from '@/lib/types';
 
@@ -36,9 +36,7 @@ export default function ClustersPage() {
   const router = useRouter();
   const [query, setQuery] = useState('');
   const [status, setStatus] = useState('all');
-
-  const [now, setNow] = useState(EPOCH_ANCHOR);
-  useEffect(() => setNow(Date.now()), []);
+  const now = useSimulatedClock();
 
   const clusters = getClusters();
 

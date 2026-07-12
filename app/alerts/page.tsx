@@ -1,11 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { EyeOff } from 'lucide-react';
 
 import AlertCard from '@/components/ui/AlertCard';
 import { getAlerts } from '@/lib/mockData';
-import { EPOCH_ANCHOR } from '@/lib/simulate';
+import { useSimulatedClock } from '@/hooks/useSimulatedClock';
 import { cx } from '@/lib/utils';
 import type { Severity } from '@/lib/types';
 
@@ -25,9 +25,7 @@ export default function AlertsPage() {
   // Resolved state is per-session, layered over the seeded data rather than
   // mutating it, so a reload returns to a known baseline.
   const [overrides, setOverrides] = useState<Record<string, boolean>>({});
-
-  const [now, setNow] = useState(EPOCH_ANCHOR);
-  useEffect(() => setNow(Date.now()), []);
+  const now = useSimulatedClock();
 
   const base = getAlerts();
   const alerts = useMemo(
