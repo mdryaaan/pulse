@@ -10,7 +10,7 @@ A dense, dark-first monitoring UI for Kubernetes fleets: cluster health, rollout
 [![Recharts](https://img.shields.io/badge/Recharts-2-8b5cf6)](https://recharts.org)
 [![License: MIT](https://img.shields.io/badge/license-MIT-3b82f6.svg)](./LICENSE)
 
-**[Live Demo](https://pulse-mdryaaan.vercel.app)**
+**[Live Demo](https://pulse-three-beta.vercel.app)**
 
 </div>
 
