@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import { useEffect, useState, type ReactNode } from 'react';
 import { X } from 'lucide-react';
 
+import { AppStateProvider } from './AppStateProvider';
 import CommandPalette from './CommandPalette';
 import Sidebar from './Sidebar';
 import TopBar from './TopBar';
@@ -36,6 +37,14 @@ function metaFor(pathname: string) {
  * holding a stale element and never mount the replacement.
  */
 export default function AppShell({ children }: { children: ReactNode }) {
+  return (
+    <AppStateProvider>
+      <Chrome>{children}</Chrome>
+    </AppStateProvider>
+  );
+}
+
+function Chrome({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const [collapsed, setCollapsed] = useState(false);
   const [mobileNavOpen, setMobileNavOpen] = useState(false);
