@@ -1,9 +1,9 @@
 'use client';
 
 import { useState } from 'react';
-import { Check, Copy, Eye, EyeOff, Moon, Sun } from 'lucide-react';
+import { Check, Copy, Eye, EyeOff, Moon, Pencil, Sun } from 'lucide-react';
 
-import { useTheme } from '@/hooks/useTheme';
+import { initialsOf, useAppState } from '@/components/layout/AppStateProvider';
 import { cx } from '@/lib/utils';
 
 // Obviously fake, and deliberately so — a demo should never look like it is
@@ -33,7 +33,10 @@ const NOTIFICATIONS = [
 ];
 
 export default function SettingsPage() {
-  const { theme, setTheme, mounted } = useTheme();
+  const { theme, setTheme, themeReady, profileName, setProfileName, profileRole } =
+    useAppState();
+  const [editingName, setEditingName] = useState(false);
+  const [draftName, setDraftName] = useState(profileName);
   const [copied, setCopied] = useState(false);
   const [revealed, setRevealed] = useState(false);
   const [toggles, setToggles] = useState<Record<string, boolean>>(() =>
@@ -53,33 +56,83 @@ export default function SettingsPage() {
 
   return (
     <div className="max-w-3xl space-y-4">
-      <Section title="Profile">
+      <Section
+        title="Profile"
+        description="A local display name for this browser. Pulse has no accounts — this is stored on your device and shown in the sidebar."
+      >
         <div className="flex items-center gap-3">
           <span
             className="grid h-11 w-11 shrink-0 place-items-center rounded-full bg-accent-500 text-sm font-bold text-white"
             aria-hidden="true"
           >
-            MR
+            {initialsOf(profileName)}
           </span>
-          <div className="min-w-0">
-            <p className="truncate text-sm font-medium text-fg">Md Raiyan</p>
-            <p className="truncate font-mono text-2xs text-fg-dim">
-              platform-engineering · admin
-            </p>
+
+          <div className="min-w-0 flex-1">
+            {editingName ? (
+              <input
+                autoFocus
+                value={draftName}
+                maxLength={32}
+                aria-label="Display name"
+                onChange={(event) => setDraftName(event.target.value)}
+                onBlur={() => {
+                  setProfileName(draftName);
+                  setEditingName(false);
+                }}
+                onKeyDown={(event) => {
+                  if (event.key === 'Enter') {
+                    setProfileName(draftName);
+                    setEditingName(false);
+                  }
+                  if (event.key === 'Escape') {
+                    setDraftName(profileName);
+                    setEditingName(false);
+                  }
+                }}
+                className="w-full rounded-control border border-accent-500 bg-base px-2.5 py-1.5 text-sm text-fg outline-none"
+              />
+            ) : (
+              <>
+                <p className="truncate text-sm font-medium text-fg">{profileName}</p>
+                <p className="truncate font-mono text-2xs text-fg-dim">{profileRole}</p>
+              </>
+            )}
           </div>
+
+          <button
+            type="button"
+            onClick={() => {
+              if (editingName) {
+                setProfileName(draftName);
+                setEditingName(false);
+              } else {
+                setDraftName(profileName);
+                setEditingName(true);
+              }
+            }}
+            aria-label={editingName ? 'Save display name' : 'Edit display name'}
+            className="grid h-8 w-8 shrink-0 place-items-center rounded-control border border-edge text-fg-muted transition-colors hover:text-fg"
+          >
+            {editingName ? (
+              <Check className="h-4 w-4" aria-hidden="true" />
+            ) : (
+              <Pencil className="h-3.5 w-3.5" aria-hidden="true" />
+            )}
+          </button>
         </div>
       </Section>
 
       <Section
         title="Appearance"
-        description="Pulse is designed dark-first for long sessions on a wall display. Light mode is supported for bright rooms."
+        description="Pulse is designed dark-first for long sessions on a wall display. Light mode is supported for bright rooms — there is also a quick toggle in the top bar."
       >
         <div role="radiogroup" aria-label="Theme" className="flex gap-2">
           {[
             { value: 'dark' as const, label: 'Dark', icon: Moon },
             { value: 'light' as const, label: 'Light', icon: Sun },
           ].map((option) => {
-            const active = mounted && theme === option.value;
+            const active = themeReady && theme === option.value;
             const Icon = option.icon;
             return (
               <button

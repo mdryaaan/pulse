@@ -12,6 +12,7 @@ import {
   Settings,
 } from 'lucide-react';
 
+import { initialsOf, useAppState } from './AppStateProvider';
 import { cx } from '@/lib/utils';
 
 export const NAV_ITEMS = [
@@ -44,6 +45,7 @@ export default function Sidebar({
   onNavigate?: () => void;
 }) {
   const pathname = usePathname();
+  const { profileName, profileRole } = useAppState();
 
   return (
     <div className="flex h-full flex-col border-r border-edge bg-panel">
@@ -135,10 +137,12 @@ export default function Sidebar({
               className="grid h-7 w-7 shrink-0 place-items-center rounded-full bg-accent-500 text-2xs font-bold text-white"
               aria-hidden="true"
             >
-              MR
+              {initialsOf(profileName)}
             </span>
             <div className="min-w-0 flex-1">
-              <p className="truncate text-xs font-medium text-fg">Md Raiyan</p>
+              <p className="truncate text-xs font-medium text-fg" title={profileRole}>
+                {profileName}
+              </p>
               <p className="flex items-center gap-1.5 truncate text-2xs text-fg-dim">
                 <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-ok" aria-hidden="true" />
                 All systems operational
