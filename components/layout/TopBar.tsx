@@ -3,6 +3,7 @@
 import { Menu, Search } from 'lucide-react';
 
 import StatusBadge from '@/components/ui/StatusBadge';
+import ThemeToggle from '@/components/ui/ThemeToggle';
 
 export default function TopBar({
   title,
@@ -40,6 +41,8 @@ export default function TopBar({
         pulse={live}
         className="hidden sm:inline-flex"
       />
+
+      <ThemeToggle />
 
       <button
         type="button"
